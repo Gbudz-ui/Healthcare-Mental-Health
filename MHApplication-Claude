@@ -1,0 +1,233 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Calendar } from '@/components/ui/calendar';
+import { AlertCircle } from 'lucide-react';
+
+// Types for tracking mental health
+interface DailyEntry {
+  date: Date;
+  stressLevel: number;
+  overworkedLevel: number;
+  stressfulSituations: string[];
+  notes?: string;
+}
+
+interface UserProfile {
+  name: string;
+  baseline: {
+    stressThreshold: number;
+    overworkedThreshold: number;
+  };
+}
+
+const HealthcareWorkerMentalHealthTracker: React.FC = () => {
+  // State management
+  const [profile, setProfile] = useState<UserProfile>({
+    name: '',
+    baseline: {
+      stressThreshold: 5,
+      overworkedThreshold: 6
+    }
+  });
+
+  const [entries, setEntries] = useState<DailyEntry[]>([]);
+  const [currentEntry, setCurrentEntry] = useState<Partial<DailyEntry>>({
+    date: new Date(),
+    stressLevel: 0,
+    overworkedLevel: 0,
+    stressfulSituations: []
+  });
+
+  const [alert, setAlert] = useState<{
+    type: 'warning' | 'danger';
+    message: string;
+  } | null>(null);
+
+  // Check for consecutive stressful days
+  const checkConsecutiveStressfulDays = useCallback(() => {
+    if (entries.length < 3) return;
+
+    const lastThreeDays = entries.slice(-3);
+    const consecutiveStressfulDays = lastThreeDays.every(entry => 
+      entry.stressLevel > profile.baseline.stressThreshold ||
+      entry.overworkedLevel > profile.baseline.overworkedThreshold
+    );
+
+    if (consecutiveStressfulDays) {
+      setAlert({
+        type: 'danger',
+        message: 'Warning: You have experienced high stress for three consecutive days. Consider seeking support.'
+      });
+    }
+  }, [entries, profile]);
+
+  // Save daily entry
+  const saveEntry = () => {
+    const newEntry: DailyEntry = {
+      date: currentEntry.date || new Date(),
+      stressLevel: currentEntry.stressLevel || 0,
+      overworkedLevel: currentEntry.overworkedLevel || 0,
+      stressfulSituations: currentEntry.stressfulSituations || []
+    };
+
+    setEntries(prevEntries => {
+      const updatedEntries = [...prevEntries, newEntry];
+      checkConsecutiveStressfulDays();
+      return updatedEntries;
+    });
+
+    // Reset current entry
+    setCurrentEntry({
+      date: new Date(),
+      stressLevel: 0,
+      overworkedLevel: 0,
+      stressfulSituations: []
+    });
+  };
+
+  // Update profile baseline
+  const updateProfile = () => {
+    // Placeholder for profile update logic
+    console.log('Profile updated', profile);
+  };
+
+  // Render stress and overworked input ranges
+  const renderLevelInput = (
+    label: string, 
+    value: number, 
+    onChange: (value: number) => void
+  ) => (
+    <div className="mb-4">
+      <Label>{label}</Label>
+      <div className="flex items-center space-x-4">
+        <Input 
+          type="range" 
+          min="0" 
+          max="10" 
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="flex-grow"
+        />
+        <span>{value}/10</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="container mx-auto p-4 max-w-2xl">
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Healthcare Worker Mental Health Tracker</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Profile Setup */}
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold mb-4">Profile Setup</h2>
+            <Input 
+              placeholder="Your Name" 
+              value={profile.name}
+              onChange={(e) => setProfile(prev => ({
+                ...prev, 
+                name: e.target.value
+              }))}
+              className="mb-4"
+            />
+            <div className="mb-4">
+              <Label>Stress Threshold</Label>
+              <Input 
+                type="number" 
+                min="0" 
+                max="10" 
+                value={profile.baseline.stressThreshold}
+                onChange={(e) => setProfile(prev => ({
+                  ...prev, 
+                  baseline: {
+                    ...prev.baseline,
+                    stressThreshold: Number(e.target.value)
+                  }
+                }))}
+                className="w-full"
+              />
+            </div>
+            <Button onClick={updateProfile} className="w-full">
+              Update Profile
+            </Button>
+          </div>
+
+          {/* Daily Entry */}
+          <div>
+            <h2 className="text-xl font-semibold mb-4">Daily Check-In</h2>
+            {/* Stress Level Input */}
+            {renderLevelInput(
+              'Stress Level', 
+              currentEntry.stressLevel || 0, 
+              (value) => setCurrentEntry(prev => ({
+                ...prev, 
+                stressLevel: value
+              }))
+            )}
+
+            {/* Overworked Level Input */}
+            {renderLevelInput(
+              'Overworked Level', 
+              currentEntry.overworkedLevel || 0, 
+              (value) => setCurrentEntry(prev => ({
+                ...prev, 
+                overworkedLevel: value
+              }))
+            )}
+
+            {/* Stressful Situations Input */}
+            <div className="mb-4">
+              <Label>Stressful Situations</Label>
+              <Input 
+                placeholder="Describe stressful situations (comma-separated)" 
+                value={currentEntry.stressfulSituations?.join(', ') || ''}
+                onChange={(e) => setCurrentEntry(prev => ({
+                  ...prev, 
+                  stressfulSituations: e.target.value.split(',').map(s => s.trim())
+                }))}
+                className="w-full"
+              />
+            </div>
+
+            {/* Save Entry Button */}
+            <Button onClick={saveEntry} className="w-full">
+              Save Daily Entry
+            </Button>
+          </div>
+
+          {/* Alert System */}
+          {alert && (
+            <Alert variant={alert.type === 'danger' ? 'destructive' : 'default'} className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Stress Alert</AlertTitle>
+              <AlertDescription>
+                {alert.message}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Past Entries Preview */}
+          <div className="mt-6">
+            <h2 className="text-xl font-semibold mb-4">Recent Entries</h2>
+            {entries.slice(-5).map((entry, index) => (
+              <div key={index} className="border p-2 mb-2 rounded">
+                <p>Date: {entry.date.toLocaleDateString()}</p>
+                <p>Stress Level: {entry.stressLevel}/10</p>
+                <p>Overworked Level: {entry.overworkedLevel}/10</p>
+                <p>Stressful Situations: {entry.stressfulSituations.join(', ')}</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default HealthcareWorkerMentalHealthTracker;
